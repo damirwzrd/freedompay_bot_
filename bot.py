@@ -9,6 +9,9 @@ from telegram.ext import (
     PreCheckoutQueryHandler,
     filters,
 )
+from flask import Flask
+import threading
+import asyncio
 
 # 🔐 Замените своими токенами
 TOKEN = "7860845577:AAEGZ_nPLGSRDXOwadzdgJGe20kKT_ZtCIY"
@@ -17,6 +20,16 @@ PROVIDER_TOKEN = "6618536796:TEST:545158"
 # Логгирование
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Flask-приложение для Render
+flask_app = Flask(__name__)
+
+@flask_app.route("/")
+def index():
+    return "OK"
+
+def run_flask():
+    flask_app.run(host="0.0.0.0", port=8000)
 
 # Команда /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -52,14 +65,19 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     logger.info("✅ Оплата прошла успешно!")
     await update.message.reply_text("✅ Спасибо! Оплата прошла успешно!")
 
-# Главная функция
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("pay", pay))
-    app.add_handler(PreCheckoutQueryHandler(precheckout_callback))
-    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-    app.run_polling()
+async def main():
+    # Запускаем Flask-сервер в отдельном потоке
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+
+    # Создаём и запускаем Telegram-бота
+    application = ApplicationBuilder().token(TOKEN).build()
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("pay", pay))
+    application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
