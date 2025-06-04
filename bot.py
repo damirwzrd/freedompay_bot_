@@ -65,19 +65,23 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     logger.info("✅ Оплата прошла успешно!")
     await update.message.reply_text("✅ Спасибо! Оплата прошла успешно!")
 
-async def main():
-    # Запускаем Flask-сервер в отдельном потоке
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.start()
-
-    # Создаём и запускаем Telegram-бота
+async def start_bot():
     application = ApplicationBuilder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("pay", pay))
     application.add_handler(PreCheckoutQueryHandler(precheckout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
 
-    await application.run_polling()
+    await application.initialize()
+    await application.start()
+    logger.info("🤖 Telegram-бот запущен.")
+    await application.updater.start_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Запускаем Flask в отдельном потоке
+    threading.Thread(target=run_flask, daemon=True).start()
+
+    # Запускаем Telegram-бота в уже работающем event loop
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_bot())
+    loop.run_forever()
